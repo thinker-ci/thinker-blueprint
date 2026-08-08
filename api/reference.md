@@ -92,6 +92,30 @@ Response:
 
 ---
 
+## Job log ingest (GCE VM agents)
+
+Called by the Thinker CI job agent running inside a GCE VM to stream output lines
+back to the Console.  Requires a valid user token (the Console injects a system token
+via instance metadata).
+
+```
+POST   /jobs/<id>/ingest-logs/     — append log lines for a job
+POST   /jobs/<id>/report-status/   — report terminal status for a job
+```
+
+**Ingest-logs body:**
+```json
+{ "lines": ["Running pytest...", "PASSED", "1 passed in 0.42s"] }
+```
+
+**Report-status body:**
+```json
+{ "status": "success", "exit_code": 0 }
+```
+`status` must be `"success"` or `"failed"`.
+
+---
+
 ## Runners (admin only)
 
 ```
@@ -106,6 +130,27 @@ POST   /runners/heartbeat/    — runner liveness check (no auth required; uses 
 **Heartbeat body:**
 ```json
 { "token": "<runner-token>", "version": "1.0.0" }
+```
+
+**GCE runner fields** (included in runner create/update body when `runner_type` is `"gce"`):
+
+```json
+{
+  "runner_type": "gce",
+  "gce_project_id": "my-gcp-project",
+  "gce_zone": "us-central1-a",
+  "gce_machine_type": "n2-standard-8",
+  "gce_image": "family/thinker-ci-runner",
+  "gce_image_project": "my-gcp-project",
+  "gce_service_account": "thinker-ci-runner@my-gcp-project.iam.gserviceaccount.com",
+  "gce_network": "ci-network",
+  "gce_subnetwork": "ci-subnet-us-central1",
+  "gce_disk_size_gb": 100,
+  "gce_use_spot": true,
+  "gce_resource_labels": { "team": "platform" },
+  "gce_network_tags": ["thinker-ci-runner", "no-external-ip"],
+  "gce_scopes": ["https://www.googleapis.com/auth/cloud-platform"]
+}
 ```
 
 ---

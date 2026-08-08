@@ -21,7 +21,22 @@ An individual command within a Job (e.g., `npm install`, `pytest`, `docker build
 A single line of stdout/stderr output captured from a running Job container. Stored as rows in the database ordered by `sequence` number. Streamed to the console in real time.
 
 **Runner**
-A registered build agent that executes Jobs. Runners communicate with the Console via REST API, sending heartbeats every 30 seconds and accepting job assignments. Runners can be Docker-type or Kubernetes-type.
+A registered build agent that executes Jobs. Runners communicate with the Console via REST API. Three runner types are supported: Docker (persistent agent on a single host), Kubernetes (pods on a cluster), and GCE (ephemeral VMs provisioned per job).
+
+**GCE Runner**
+A runner of type `gce` that provisions a fresh Google Compute Engine VM for every job. The VM boots from a custom image containing the Thinker CI job agent, executes exactly one job, and then self-deletes. The Runner model record describes the pool configuration (machine type, image, zone, network) rather than a specific running machine.
+
+**Job Agent**
+The shell script (`/etc/thinker-ci/agent.sh`) embedded in the GCE custom image. It reads its job assignment from the GCE instance metadata server, clones the repo, runs each step inside Docker, streams log output back to the Console via `POST /api/v1/jobs/{id}/ingest-logs/`, and reports the terminal status via `POST /api/v1/jobs/{id}/report-status/`.
+
+**Image Family**
+A Google Cloud concept used to group versioned VM images.  Thinker CI uses the family name `thinker-ci-runner`.  Setting `gce_image: "family/thinker-ci-runner"` always resolves to the latest published image in that family, enabling seamless image updates without changing runner configuration.
+
+**Spot VM**
+A GCE Spot (formerly Preemptible) VM that is significantly cheaper (60–91%) than a standard VM but may be reclaimed by Google at any time.  Enabled per runner pool via `gce_use_spot: true`.  Suitable for non-critical or retry-tolerant CI jobs.
+
+**Self-destruct**
+The behaviour of a GCE job VM deleting itself via `gcloud compute instances delete` after the job completes.  Controlled by the `thinker-ci-self-destruct` instance metadata key.  Backed up by the `reap_orphaned_gce_instances` Celery task.
 
 **Project**
 A Git repository connected to Thinker CI. Projects belong to an owner (user), have zero or more members, and contain one or more Pipelines. Projects store the webhook secret used to verify incoming events from the Git provider.

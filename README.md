@@ -11,13 +11,15 @@ This repository is the authoritative reference for the Thinker CI/CD platform. I
 | [terminology/](terminology/) | Canonical glossary of all domain terms |
 | [api/](api/) | API design principles, endpoint reference, webhook contracts |
 | [operations/](operations/) | Deployment, scaling, observability, runbooks |
+| [runners/](runners/) | Runner type deep-dives — GCE runner config and custom image guide |
 
 ## What is Thinker CI?
 
-Thinker CI is a self-hosted CI/CD platform built on Django and Celery, designed to orchestrate build and deployment pipelines on Docker and Kubernetes infrastructure. It provides:
+Thinker CI is a self-hosted CI/CD platform built on Django and Celery, designed to orchestrate build and deployment pipelines on Docker, Kubernetes, and Google Compute Engine infrastructure. It provides:
 
 - **Git-native pipelines** — YAML-configured pipelines triggered by push, pull-request, tag, or schedule events
-- **Pluggable runners** — build agents that run jobs inside Docker containers or Kubernetes pods
+- **Pluggable runners** — three execution backends: Docker containers, Kubernetes pods, or ephemeral GCE VMs
+- **On-demand GCE VMs** — each job gets a fresh VM provisioned from a custom image; no cross-job state leakage
 - **Real-time log streaming** — job output streamed to the console as it executes
 - **REST API** — all functionality exposed via a versioned JSON API
 - **Multi-project support** — projects linked to GitHub, GitLab, or Bitbucket repositories

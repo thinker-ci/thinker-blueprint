@@ -34,7 +34,8 @@
 
 ## Runner Agent
 
-Not yet a separate repository — currently the runner logic lives within the Celery worker using the `docker` and `kubernetes` Python SDKs.
+Runner logic lives within the Celery worker using the `docker`, `kubernetes`, and
+`google-cloud-compute` Python SDKs.  Three execution backends are supported:
 
 **Docker execution path:**
 1. Pull the job's image (or use a cached layer)
@@ -47,6 +48,18 @@ Not yet a separate repository — currently the runner logic lives within the Ce
 2. Watch pod phase transitions via the k8s watch API
 3. Stream pod logs to `JobLog`
 4. On pod completion/failure, clean up and record result
+
+**GCE execution path (ephemeral VMs):**
+1. `execute_gce_job` task calls `apps.runners.gce.provision_vm()`
+2. A fresh GCE VM is created using the runner pool configuration (machine type, image, zone, network)
+3. Job context (job ID, Console URL, auth token) is injected via GCE instance metadata
+4. The VM boots the custom Thinker CI image; systemd starts the job agent on first boot
+5. The agent clones the repo, runs each step inside Docker, and streams log lines to `POST /api/v1/jobs/{id}/ingest-logs/`
+6. On completion the agent calls `POST /api/v1/jobs/{id}/report-status/` and self-deletes
+7. The Celery poll loop detects terminal status and calls `terminate_vm()` as a safety net
+
+See [runners/gce-runner.md](../runners/gce-runner.md) for configuration and IAM requirements.
+See [runners/gce-custom-image.md](../runners/gce-custom-image.md) for building the VM image.
 
 ---
 

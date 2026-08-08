@@ -71,6 +71,40 @@
 
 ---
 
+## ADR-006: GCE ephemeral VMs as a third runner type
+
+**Status:** Accepted
+
+**Context:** Docker runners require a permanently-running host; Kubernetes runners require
+a cluster.  Some workloads need full VM isolation, GPU access, large build caches on SSD,
+or a completely clean environment on every run — none of which are easily satisfied
+by containers.
+
+**Decision:** Add a `gce` runner type that provisions a fresh Google Compute Engine VM per
+job using `google-cloud-compute`, then deletes it when the job is done.
+
+**Rationale:**
+- Each job gets a guaranteed-clean OS; no cross-job state leakage is possible
+- Machine type is configurable per runner pool — including GPU, high-memory, and ARM instances
+- Docker-in-Docker is native (no privileged containers or DinD side-cars needed)
+- Spot VMs reduce cost by 60–91% for workloads that tolerate preemption
+- The `Runner` model already has a `runner_type` discriminator, so adding `gce` requires
+  no schema changes beyond new GCE-specific fields
+
+**Alternatives considered:**
+- Always use Docker-in-Docker on Kubernetes — possible but requires privileged pods and
+  couples job isolation to cluster-level security policy
+- Reuse a pool of long-lived GCE VMs — avoids boot latency but sacrifices cleanliness
+  and makes secret exposure risks harder to reason about
+
+**Trade-offs:**
+- VM boot latency (20–60 s) is much higher than container start (< 1 s)
+- Requires `google-cloud-compute` credentials on the Console process
+- The job-agent-in-VM callback architecture (log ingest, status report) adds two new API
+  endpoints that must be hardened against abuse
+
+---
+
 ## ADR-005: Token-based authentication (no JWT)
 
 **Status:** Accepted
