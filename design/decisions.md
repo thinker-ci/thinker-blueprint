@@ -119,3 +119,52 @@ job using `google-cloud-compute`, then deletes it when the job is done.
 - Runners use long-lived tokens; users can rotate their tokens via `POST /api/v1/auth/token/rotate/`
 
 **Trade-off:** Tokens require a DB lookup on every request. At our expected scale this is negligible. If we need to scale to tens of thousands of concurrent API clients, we can layer JWT on top without breaking the API contract.
+
+---
+
+## ADR-007: JSON Schema + semantic validation for pipeline configs
+
+**Status:** Accepted
+
+**Context:** `Pipeline.config` is a freeform `JSONField`. Without validation, a typo
+(empty `steps`, missing `image`, duplicate stage name) is only discovered when a job
+tries to execute, producing a cryptic Celery error deep in the task log rather than
+a clear message at the point of authorship.
+
+**Decision:** Validate `Pipeline.config` at every entry point using a two-layer
+approach in `apps/pipelines/config_schema.py`:
+
+1. **JSON Schema (Draft 7)** — enforces structural correctness: required keys, type
+   constraints, pattern restrictions on names, numeric bounds on `timeout`, and an
+   `additionalProperties: false` guard against undocumented keys.
+2. **Semantic checks** — enforce cross-field rules the schema cannot express: unique
+   stage names, unique job names within a stage, and the requirement that every job
+   has an `image` (either per-job or inherited from the top-level field).
+
+**Enforcement points:**
+- `PipelineSerializer.validate_config` — `400` with a full error list before the
+  record is saved
+- `Pipeline.clean()` — caught by Django admin and any `full_clean()` caller
+- `dispatch_pipeline_run` Celery task — fail-fast guard before any jobs are created;
+  writes a readable error to `PipelineRun.error_message`
+
+**Rationale:**
+- Reporting all errors in one response (not just the first) lets authors fix a
+  broken config in one round-trip instead of iterating through problems one at a time
+- Enforcing validation in the task as well means configs saved before the validator
+  existed are still caught cleanly at dispatch time
+- `jsonschema` Draft 7 is the de facto Python standard; no bespoke parser needed
+- `additionalProperties: false` prevents silent schema drift — adding an undocumented
+  key is an immediate error, not a silent no-op
+
+**Alternatives considered:**
+- Validate only at the API layer — configs created via Django shell or migrations
+  would bypass validation; runtime errors would still be cryptic
+- Store configs as YAML in a separate file — adds filesystem coupling and complicates
+  the API; the JSON-in-DB approach is already established
+
+**Trade-offs:**
+- `jsonschema` adds a dependency (`jsonschema==4.25.1` in `requirements/base.txt`)
+- Schema changes require updating `_PIPELINE_SCHEMA`, semantic checks, tests, and
+  this document — but that friction is intentional: undocumented schema changes
+  should not be easy to slip through

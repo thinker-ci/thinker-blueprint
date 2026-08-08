@@ -235,7 +235,30 @@ Generate a random secret (e.g. `openssl rand -hex 32`) and store it in `Project.
 
 ## Pipeline config schema
 
-A pipeline config is a JSON document stored in `Pipeline.config`:
+A pipeline config is a JSON document stored in `Pipeline.config`. See
+[pipelines/config-schema.md](../pipelines/config-schema.md) for the complete
+field reference, validation rules, and examples.
+
+**Minimal valid config:**
+
+```json
+{
+  "stages": [
+    {
+      "name": "test",
+      "jobs": [
+        {
+          "name": "pytest",
+          "image": "python:3.12-slim",
+          "steps": ["pytest --tb=short -q"]
+        }
+      ]
+    }
+  ]
+}
+```
+
+**Multi-stage config with a shared top-level image:**
 
 ```json
 {
@@ -246,11 +269,12 @@ A pipeline config is a JSON document stored in `Pipeline.config`:
       "jobs": [
         {
           "name": "install",
-          "image": "python:3.12-slim",
           "tags": ["linux"],
-          "steps": [
-            "pip install -r requirements/base.txt"
-          ]
+          "steps": ["pip install -r requirements/base.txt"]
+        },
+        {
+          "name": "lint",
+          "steps": ["ruff check ."]
         }
       ]
     },
@@ -259,10 +283,44 @@ A pipeline config is a JSON document stored in `Pipeline.config`:
       "jobs": [
         {
           "name": "pytest",
-          "steps": ["pytest --tb=short -q"]
+          "steps": ["pytest --tb=short -q"],
+          "timeout": 300
         }
       ]
     }
   ]
+}
+```
+
+### Config validation errors (API)
+
+When `POST /api/v1/projects/<slug>/pipelines/` or `PATCH /api/v1/pipelines/<id>/`
+receives an invalid config, the response is `400` with `config` containing an array
+of all problems (not just the first):
+
+```json
+HTTP 400 Bad Request
+{
+  "config": [
+    "stages[0].jobs[0].steps: [] is too short",
+    "stages[0].jobs[0]: 'image' is required on the job or at the top level"
+  ]
+}
+```
+
+### Config validation errors (run-time)
+
+A run that fails validation before any job starts has:
+
+- `status`: `"failed"`
+- `error_message`: human-readable bullet list of all problems
+- `jobs`: `[]`
+
+```json
+{
+  "id": 42,
+  "status": "failed",
+  "error_message": "Config validation failed:\n  • stages[0].jobs[0].steps: [] is too short",
+  "jobs": []
 }
 ```

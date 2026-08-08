@@ -13,6 +13,7 @@ This repository is the authoritative reference for the Thinker CI/CD platform. I
 | [operations/](operations/) | Deployment, scaling, observability, runbooks |
 | [runners/](runners/) | Runner type deep-dives — GCE runner config and custom image guide |
 | [webhooks/](webhooks/) | Webhook handler — provider setup, event mapping, idempotency, security |
+| [pipelines/](pipelines/) | Pipeline config schema — field reference, validation rules, error format, examples |
 
 ## What is Thinker CI?
 
@@ -25,6 +26,7 @@ Thinker CI is a self-hosted CI/CD platform built on Django and Celery, designed 
 - **REST API** — all functionality exposed via a versioned JSON API
 - **Multi-project support** — projects linked to GitHub, GitLab, or Bitbucket repositories
 - **Webhook integration** — inbound HMAC-verified webhooks trigger pipelines automatically; every delivery is stored for audit and debugging
+- **Config validation** — pipeline configs are validated against a JSON Schema at save time and again at dispatch; all errors reported at once with precise field paths
 
 ## Repositories
 

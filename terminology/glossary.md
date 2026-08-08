@@ -62,6 +62,15 @@ The provider-agnostic event classification used for pipeline matching. Values: `
 **Trigger event**
 The action that initiated a Pipeline Run. Values: `push`, `pull_request`, `tag`, `schedule`, `manual`.
 
+**Pipeline config**
+The JSON document stored in `Pipeline.config` that defines the full build/test/deploy workflow: stages, jobs, steps, images, environment variables, and timeouts. Validated against a JSON Schema and a set of semantic rules on every save and again at dispatch time.
+
+**ConfigValidationError**
+The exception raised by `apps/pipelines/config_schema.validate_config()` when a pipeline config fails validation. Carries a list of all errors (not just the first) so callers can surface a complete report in a single API response.
+
+**error_message**
+A field on `PipelineRun` set when a run fails before any jobs are created (e.g. config validation fails at dispatch time). Contains a bulleted list of all validation errors. Exposed as a read-only field in the run API response and visible in the Django admin.
+
 ---
 
 ## Infrastructure terms
