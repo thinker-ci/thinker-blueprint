@@ -157,11 +157,79 @@ POST   /runners/heartbeat/    — runner liveness check (no auth required; uses 
 
 ## Webhook endpoint
 
+Base URL: `https://<host>/hooks/` (not under `/api/v1/`)
+
 ```
-POST   /webhooks/<project_slug>/
+POST   /hooks/<project_slug>/
 ```
 
-Not versioned under `/api/v1/` — this is an inbound-only endpoint for Git providers. Validated using `X-Hub-Signature-256` (GitHub) or `X-Gitlab-Token` headers.
+Inbound-only endpoint for Git providers. Not authenticated with a user token — identity is established via HMAC signature or token header. No CSRF protection (machine-to-machine).
+
+Every inbound request is stored as a `WebhookDelivery` audit record before processing, including rejected requests.
+
+### Provider-specific request shape
+
+#### GitHub
+
+| Header | Value |
+|---|---|
+| `X-GitHub-Event` | Event name, e.g. `push`, `pull_request`, `ping` |
+| `X-GitHub-Delivery` | UUID identifying this delivery (used for idempotency) |
+| `X-Hub-Signature-256` | `sha256=<HMAC-SHA256 hex of body using webhook_secret>` |
+
+Supported events: `push` (branch and tag), `pull_request` (opened, synchronize, reopened), `create`, `ping`.
+
+#### GitLab
+
+| Header | Value |
+|---|---|
+| `X-Gitlab-Event` | Event name, e.g. `Push Hook`, `Tag Push Hook`, `Merge Request Hook` |
+| `X-Gitlab-Token` | The plain-text `webhook_secret` from the project |
+
+Supported events: `Push Hook`, `Tag Push Hook`, `Merge Request Hook` (open, update, reopen).
+
+#### Bitbucket
+
+| Header | Value |
+|---|---|
+| `X-Event-Key` | Event name, e.g. `repo:push`, `pullrequest:created` |
+| `X-Request-UUID` | UUID identifying this delivery (used for idempotency) |
+| `X-Hub-Signature` | `sha256=<HMAC-SHA256 hex of body using webhook_secret>` |
+
+Supported events: `repo:push` (branch and tag), `pullrequest:created`, `pullrequest:updated`.
+
+### Responses
+
+| Status | Meaning |
+|---|---|
+| 200 | Accepted and queued, or ping acknowledged, or idempotent re-delivery |
+| 200 (skipped) | Signature valid but event matched no pipelines |
+| 403 | Signature verification failed |
+| 404 | Project slug not found |
+| 500 | Unexpected server error |
+
+**Success body:**
+```json
+{ "detail": "Queued 2 pipeline run(s).", "run_ids": [17, 18] }
+```
+
+**Ping body:**
+```json
+{ "detail": "pong" }
+```
+
+**Idempotent re-delivery:**
+```json
+{ "detail": "Already processed.", "run_ids": [17] }
+```
+
+### Setting the webhook secret
+
+Generate a random secret (e.g. `openssl rand -hex 32`) and store it in `Project.webhook_secret`. Then configure your Git provider to sign deliveries with that secret:
+
+- **GitHub**: Repository → Settings → Webhooks → Add webhook → Secret
+- **GitLab**: Repository → Settings → Webhooks → Secret token
+- **Bitbucket**: Repository → Settings → Webhooks → (secret is passed as the signature key)
 
 ---
 

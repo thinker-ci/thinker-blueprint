@@ -12,6 +12,7 @@ This repository is the authoritative reference for the Thinker CI/CD platform. I
 | [api/](api/) | API design principles, endpoint reference, webhook contracts |
 | [operations/](operations/) | Deployment, scaling, observability, runbooks |
 | [runners/](runners/) | Runner type deep-dives — GCE runner config and custom image guide |
+| [webhooks/](webhooks/) | Webhook handler — provider setup, event mapping, idempotency, security |
 
 ## What is Thinker CI?
 
@@ -23,6 +24,7 @@ Thinker CI is a self-hosted CI/CD platform built on Django and Celery, designed 
 - **Real-time log streaming** — job output streamed to the console as it executes
 - **REST API** — all functionality exposed via a versioned JSON API
 - **Multi-project support** — projects linked to GitHub, GitLab, or Bitbucket repositories
+- **Webhook integration** — inbound HMAC-verified webhooks trigger pipelines automatically; every delivery is stored for audit and debugging
 
 ## Repositories
 

@@ -42,7 +42,22 @@ The behaviour of a GCE job VM deleting itself via `gcloud compute instances dele
 A Git repository connected to Thinker CI. Projects belong to an owner (user), have zero or more members, and contain one or more Pipelines. Projects store the webhook secret used to verify incoming events from the Git provider.
 
 **Webhook**
-An HTTP POST request sent by a Git provider (GitHub, GitLab, Bitbucket) to the Console when a repository event occurs (push, pull request, tag). Webhooks are verified using HMAC-SHA256 and used to trigger Pipeline Runs automatically.
+An HTTP POST request sent by a Git provider (GitHub, GitLab, Bitbucket) to the Console when a repository event occurs (push, pull request, tag). Webhooks arrive at `POST /hooks/<project_slug>/` and are verified using HMAC-SHA256 (GitHub, Bitbucket) or a plain token header (GitLab). Used to trigger Pipeline Runs automatically.
+
+**WebhookDelivery**
+An audit log record created for every inbound webhook request, including rejected ones. Stores the raw headers, raw payload, normalised event fields, processing status (`received`, `processed`, `skipped`, `rejected`, `error`), and the IDs of any PipelineRuns created. Viewable in the Django admin.
+
+**Delivery ID**
+A provider-supplied UUID included in each webhook request (`X-GitHub-Delivery` for GitHub, `X-Request-UUID` for Bitbucket). Used to make webhook processing idempotent — if the same delivery ID arrives twice (e.g. due to a provider retry), the second request returns the cached result without re-running pipelines.
+
+**Webhook secret**
+A random string stored on the Project (`webhook_secret`) and shared with the Git provider. GitHub and Bitbucket use it as the HMAC-SHA256 key; GitLab compares it as a plain token. Generated per-project — `openssl rand -hex 32` is a suitable command.
+
+**Provider event**
+The raw event name from the Git provider's webhook header, before normalisation. Examples: `push` (GitHub), `Push Hook` (GitLab), `repo:push` (Bitbucket). Stored on `WebhookDelivery.provider_event` for debugging.
+
+**Normalised event type**
+The provider-agnostic event classification used for pipeline matching. Values: `push`, `pull_request`, `tag`, `ping`. Stored on `WebhookDelivery.event_type` and matched against `Pipeline.trigger_events`.
 
 **Trigger event**
 The action that initiated a Pipeline Run. Values: `push`, `pull_request`, `tag`, `schedule`, `manual`.
